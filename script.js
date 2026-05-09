@@ -12,6 +12,7 @@ const catalogNameInput = document.getElementById('catalog-name');
 const generateBtn = document.getElementById('generate-btn');
 const previewContainer = document.getElementById('preview-container');
 const watermarkSelect = document.getElementById('watermark-select');
+const backgroundSelect = document.getElementById('background-select');
 
 // Coordenadas especificadas por el usuario para la imagen y el texto
 const PHOTO_BOX = { x: 57.9, y: 58.4, w: 962.4, h: 1634.6 };
@@ -25,6 +26,14 @@ fondoImg.onload = () => {
     bgReady = true;
 };
 fondoImg.src = FONDO_B64;
+
+const fondo2Img = new Image();
+let bg2Ready = false;
+
+fondo2Img.onload = () => {
+    bg2Ready = true;
+};
+fondo2Img.src = FONDO2_B64;
 
 // Cargar las marcas de agua desde Base64
 const logoBlanco = new Image();
@@ -73,17 +82,22 @@ catalogNameInput.addEventListener('input', () => {
 watermarkSelect.addEventListener('change', () => {
     renderPreviews();
 });
+backgroundSelect.addEventListener('change', () => {
+    renderPreviews();
+});
 
 // Función para dibujar una página entera (Fondo + Foto + Marca de Agua + Texto)
 function drawPage(canvas, photoImg, catalogName) {
     const ctx = canvas.getContext('2d');
     
+    const selectedBgImg = backgroundSelect.value === 'fondo1' ? fondoImg : fondo2Img;
+
     // Dimensiones del lienzo coinciden con el fondo (1080x1920 aprox)
-    canvas.width = fondoImg.width;
-    canvas.height = fondoImg.height;
+    canvas.width = selectedBgImg.width;
+    canvas.height = selectedBgImg.height;
 
     // 1. Dibujar el fondo completo
-    ctx.drawImage(fondoImg, 0, 0);
+    ctx.drawImage(selectedBgImg, 0, 0);
 
     // *Se eliminó el relleno gris fijo para que se vea el rectángulo gris original del fondo.png*
 
@@ -110,27 +124,29 @@ function drawPage(canvas, photoImg, catalogName) {
     ctx.drawImage(photoImg, drawX, drawY, drawW, drawH);
 
     // 3. Dibujar la Marca de Agua (Semitraslúcida en el centro de la foto)
-    const wmLogo = watermarkSelect.value === 'blanco' ? logoBlanco : logoNegro;
-    if (wmLogo.complete && wmLogo.naturalWidth > 0) {
-        ctx.save();
-        ctx.globalAlpha = 0.5; // Marca de agua semitraslúcida (50%)
-        
-        // Determinar el tamaño de la marca de agua (ej. 60% del ancho de la caja o tamaño original si es menor)
-        const maxW = PHOTO_BOX.w * 0.6;
-        let wmW = wmLogo.width;
-        let wmH = wmLogo.height;
-        
-        if (wmW > maxW) {
-            const ratio = maxW / wmW;
-            wmW = maxW;
-            wmH = wmH * ratio;
+    if (watermarkSelect.value !== 'ninguna') {
+        const wmLogo = watermarkSelect.value === 'blanco' ? logoBlanco : logoNegro;
+        if (wmLogo.complete && wmLogo.naturalWidth > 0) {
+            ctx.save();
+            ctx.globalAlpha = 0.5; // Marca de agua semitraslúcida (50%)
+            
+            // Determinar el tamaño de la marca de agua (ej. 60% del ancho de la caja o tamaño original si es menor)
+            const maxW = PHOTO_BOX.w * 0.6;
+            let wmW = wmLogo.width;
+            let wmH = wmLogo.height;
+            
+            if (wmW > maxW) {
+                const ratio = maxW / wmW;
+                wmW = maxW;
+                wmH = wmH * ratio;
+            }
+
+            const wmX = PHOTO_BOX.x + (PHOTO_BOX.w - wmW) / 2;
+            const wmY = PHOTO_BOX.y + (PHOTO_BOX.h - wmH) / 2;
+
+            ctx.drawImage(wmLogo, wmX, wmY, wmW, wmH);
+            ctx.restore();
         }
-
-        const wmX = PHOTO_BOX.x + (PHOTO_BOX.w - wmW) / 2;
-        const wmY = PHOTO_BOX.y + (PHOTO_BOX.h - wmH) / 2;
-
-        ctx.drawImage(wmLogo, wmX, wmY, wmW, wmH);
-        ctx.restore();
     }
 
     // 4. Dibujar el nombre del catálogo si existe
@@ -175,7 +191,10 @@ generateBtn.addEventListener('click', () => {
         return;
     }
     
-    if (!bgReady) {
+    const selectedBgImg = backgroundSelect.value === 'fondo1' ? fondoImg : fondo2Img;
+    const isBgReady = backgroundSelect.value === 'fondo1' ? bgReady : bg2Ready;
+
+    if (!isBgReady) {
         alert('Cargando el fondo, por favor espera un segundo e intenta de nuevo.');
         return;
     }
@@ -192,7 +211,7 @@ generateBtn.addEventListener('click', () => {
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'px',
-                format: [fondoImg.width, fondoImg.height]
+                format: [selectedBgImg.width, selectedBgImg.height]
             });
 
             const catalogName = catalogNameInput.value;
@@ -205,9 +224,9 @@ generateBtn.addEventListener('click', () => {
                 const imgData = canvas.toDataURL('image/jpeg', 0.9);
                 
                 if (index > 0) {
-                    pdf.addPage([fondoImg.width, fondoImg.height], 'portrait');
+                    pdf.addPage([selectedBgImg.width, selectedBgImg.height], 'portrait');
                 }
-                pdf.addImage(imgData, 'JPEG', 0, 0, fondoImg.width, fondoImg.height);
+                pdf.addImage(imgData, 'JPEG', 0, 0, selectedBgImg.width, selectedBgImg.height);
             });
 
             // Descargar el archivo
